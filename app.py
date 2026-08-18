@@ -112,8 +112,8 @@ if st.session_state.total_focus_time >= 60:
             st.markdown(f"<h3 style='text-align: center;'>【本日のランダム一杯】<br>{bean_choice} × {menu_choice}</h3>", unsafe_allow_html=True)
             
             genai.configure(api_key=current_key)
-            # モデル名を最新の flash に変更
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            # モデル名を最新の gemini-3.6-flash に変更
+            model = genai.GenerativeModel('gemini-3.6-flash')
             
             with st.spinner("マスターが豆を挽き、心を込めて抽出しています..."):
                 prompt = f"""
