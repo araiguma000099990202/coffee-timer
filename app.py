@@ -6,7 +6,7 @@ import random
 # ページの設定
 st.set_page_config(page_title="Coffee Timer", page_icon="☕", layout="centered")
 
-# --- データの保存（時間貯金・コレクション）の準備 ---
+# --- データの保存（時間貯金・コレクション・APIキー）の準備 ---
 if 'total_focus_time' not in st.session_state:
     st.session_state.total_focus_time = 0
 
@@ -17,8 +17,11 @@ if 'collection' not in st.session_state:
 st.title("☕ 焙煎コーヒータイマー")
 st.write("集中した時間をストックし、マスターへ「注文」して極上のコレクションを増やしましょう。")
 
-# セキュリティのため、APIキーは画面上で入力
-api_key = st.text_input("Gemini APIキーを入力（パスワードのように隠れます）", type="password")
+# セキュリティのため、APIキーはセッション状態に保存して消えないようにする
+api_key_input = st.text_input("Gemini APIキーを入力（パスワードのように隠れます）", type="password")
+if api_key_input:
+    st.session_state.api_key = api_key_input
+
 st.markdown("---")
 
 # ==========================================
@@ -35,7 +38,8 @@ with col_test:
     is_test = st.checkbox("テストモード（数秒で完了）")
 
 if st.button("▶️ タイマー開始！", use_container_width=True):
-    if not api_key:
+    current_key = st.session_state.get('api_key', '')
+    if not current_key:
         st.error("一番上にAPIキーを入力してください！")
     elif not task_name:
         st.warning("取り組む作業を入力してください（マスターがメッセージの参考にします！）")
@@ -95,44 +99,48 @@ if st.session_state.total_focus_time >= 60:
     
     # 「注文」と入力された、またはボタンが押された場合
     if order_input == "注文" or st.button("🛎️ 注文する", use_container_width=True):
-        bean_choice = random.choice(beans_list)
-        menu_choice = random.choice(list(menus_dict.keys()))
-        menu_icon = menus_dict[menu_choice]
-        
-        # シンプルな見栄えの表示
-        st.markdown(f"<h1 style='text-align: center; font-size: 60px;'>{menu_icon} ☕</h1>", unsafe_allow_html=True)
-        st.markdown(f"<h3 style='text-align: center;'>【本日のランダム一杯】<br>{bean_choice} × {menu_choice}</h3>", unsafe_allow_html=True)
-        
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        with st.spinner("マスターが豆を挽き、心を込めて抽出しています..."):
-            prompt = f"""
-            あなたはこだわりのカフェのマスターです。常連客が合計60分以上の集中作業（今回の主な作業：{task_name}）を見事に達成しました。
-            お客様が「注文」と声をかけ、マスターであるあなたがランダムに選んだ「{bean_choice}」の豆を使った「{menu_choice}」を提供します。
+        current_key = st.session_state.get('api_key', '')
+        if not current_key:
+            st.error("APIキーが記憶されていません。一番上で一度キーを入れ直してください！")
+        else:
+            bean_choice = random.choice(beans_list)
+            menu_choice = random.choice(list(menus_dict.keys()))
+            menu_icon = menus_dict[menu_choice]
             
-            以下の要素を必ず入れて、極上のねぎらいのメッセージを出力してください。
-            1. 丁寧なドリップの情景描写
-            2. 選ばれた豆（{bean_choice}）の産地の特徴やウンチク
-            3. メニュー（{menu_choice}）の味わいの表現
-            4. お客様の努力（{task_name}）を称賛する温かい一言
+            # シンプルな見栄えの表示
+            st.markdown(f"<h1 style='text-align: center; font-size: 60px;'>{menu_icon} ☕</h1>", unsafe_allow_html=True)
+            st.markdown(f"<h3 style='text-align: center;'>【本日のランダム一杯】<br>{bean_choice} × {menu_choice}</h3>", unsafe_allow_html=True)
             
-            トーンは落ち着いていて、知性的で心温まるマスターの口調でお願いします。
-            """
-            try:
-                response = model.generate_content(prompt)
-                st.markdown("### 📜 マスターからのメッセージ")
-                st.info(response.text)
+            genai.configure(api_key=current_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            with st.spinner("マスターが豆を挽き、心を込めて抽出しています..."):
+                prompt = f"""
+                あなたはこだわりのカフェのマスターです。常連客が合計60分以上の集中作業（今回の主な作業：{task_name}）を見事に達成しました。
+                お客様が「注文」と声をかけ、マスターであるあなたがランダムに選んだ「{bean_choice}」の豆を使った「{menu_choice}」を提供します。
                 
-                # コレクションに追加
-                st.session_state.collection.append(f"{menu_icon} {bean_choice} ✕ {menu_choice} （作業: {task_name}）")
+                以下の要素を必ず入れて、極上のねぎらいのメッセージを出力してください。
+                1. 丁寧なドリップの情景描写
+                2. 選ばれた豆（{bean_choice}）の産地の特徴やウンチク
+                3. メニュー（{menu_choice}）の味わいの表現
+                4. お客様の努力（{task_name}）を称賛する温かい一言
                 
-                # ストックから60分を消費
-                st.session_state.total_focus_time -= 60
-                st.success("✨ コレクションに新しい一杯が追加されました！")
-                
-            except Exception as e:
-                st.error("エラーが発生しました。APIキーを確認してください。")
+                トーンは落ち着いていて、知性的で心温まるマスターの口調でお願いします。
+                """
+                try:
+                    response = model.generate_content(prompt)
+                    st.markdown("### 📜 マスターからのメッセージ")
+                    st.info(response.text)
+                    
+                    # コレクションに追加
+                    st.session_state.collection.append(f"{menu_icon} {bean_choice} ✕ {menu_choice} （作業: {task_name}）")
+                    
+                    # ストックから60分を消費
+                    st.session_state.total_focus_time -= 60
+                    st.success("✨ コレクションに新しい一杯が追加されました！")
+                    
+                except Exception as e:
+                    st.error(f"エラーが発生しました: {e}")
 else:
     st.info(f"💡 極上の1杯まで、あと **{60 - st.session_state.total_focus_time} 分** の集中が必要です！")
 
